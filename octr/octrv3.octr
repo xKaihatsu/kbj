@@ -1,0 +1,277 @@
+177 105 114 106 ; ELF Signature
+001 ; ELF-32
+001 ; little endian
+001 ; current ELF version
+000 ; System-V ABI
+000 ; ABI Version
+000 000 000 000 000 000 000 ; padding
+002 000 ; executable object file
+003 000 ; i386
+001 000 000 000 ; original file version
+124 000 000 010 ; entry point
+064 000 000 000 ; start of segment headers
+000 000 000 000 ; start of section headers
+000 000 000 000 ; flags
+064 000 ; size of this header
+040 000 ; size of segment header
+001 000 ; number of segment headers
+050 000 ; size of section header
+000 000 ; number of section headers
+000 000 ; string table index
+
+; .text segment header
+001 000 000 000 ; loadable segment
+124 000 000 000 ; offset in file
+124 000 000 010 ; virtual address
+000 000 000 000 ; physical address
+000 002 000 000 ; size on disk
+000 002 000 000 ; size in memory
+005 000 000 000 ; R+X permissions
+001 000 000 000 ; alignment
+
+; .text = 001 000 000 124
+
+; _start
+213 354 ; mov ebp, esp
+201 355 070 041 000 000 ; sub esp, 0x2138
+; output: uint8* -0x4
+; outputLength: uint32 -0x8
+; inputIndex: uint32 -0xC
+; inputLength: uint32 -0x10
+; locationCounter: uint32 -0x14
+; origin: uint32 -0x18
+; labelEnd: Label* -0x1C
+; labelBuffer: uint8[28] -0x38
+; inputBuffer: uint8[256] -0x138
+; labels: Label[256] -0x2138
+; struct Label {
+;	uint32 Address;
+;	uint32 Length;
+;	uint8[28] Name;
+; }
+
+063 333 ; xor ebx, ebx
+215 225 310 336 377 377 ; lea edx, [ebp - 0x2138]
+211 135 374 ; mov dword [ebp - 0x4], ebx
+211 135 370 ; mov dword [ebp - 0x8], ebx
+211 135 364 ; mov dword [ebp - 0xC], ebx
+211 135 360 ; mov dword [ebp - 0x10], ebx
+211 135 354 ; mov dword [ebp - 0x14], ebx
+211 135 350 ; mov dword [ebp - 0x18], ebx
+211 125 344 ; mov dword [ebp - 0x1C], edx
+
+270 132 000 000 000 ; mov eax, 0x5A
+201 354 030 000 000 000 ; sub esp, 0x18
+211 034 044 ; mov dword [esp], ebx
+307 104 044 004 000 020 000 000 ; mov dword [esp + 0x4], 0x1000
+307 104 044 010 003 000 000 000 ; mov dword [esp + 0x8], 0x3 ; PROT_READ(0x1) | PROT_WRITE(0x2)
+307 104 044 014 042 000 000 000 ; mov dword [esp + 0xC], 0x22 ; MAP_PRIVATE(0x2) | MAP_ANONYMOUS(0x20)
+307 104 044 020 377 377 377 377 ; mov dword [esp + 0x10], -1
+211 134 044 024 ; mov dword [esp + 0x14], ebx
+213 334 ; mov ebx, esp
+315 200 ; int 0x80 ; syscall(null, 0x1000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS)
+211 105 374 ; mov dword [ebp - 4], eax
+201 304 030 000 000 000 ; add esp, 0x18
+213 335 ; mov ebx, ebp
+
+; .readBegin:
+350 364 000 000 000 ; call read8
+205 300 ; test eax, eax
+017 216 336 000 000 000 ; jle .epilogue
+
+074 040 ; cmp al, ' '
+176 357 ; jle .readBegin
+
+074 073 ; cmp al, ';'
+165 016 ; jne .isOctalDigit
+
+; .readComment:
+350 337 000 000 000 ; call read8
+074 012 ; cmp al, '\n'
+165 367 ; jne .readComment
+351 335 377 377 377 ; jmp .readBegin
+
+; .isOctalDigit:
+074 060 ; cmp al, '0'
+017 235 301 ; setge cl
+074 067 ; cmp al, '7'
+017 236 302 ; setle dl
+042 312 ; and cl, dl
+164 047 ; jz .readLabel
+
+061 377 ; xor edi, edi
+; .readOctalDigit:
+301 347 003 ; shl edi, 3
+044 017 ; and al, 0xF
+003 370 ; add edi, eax
+350 272 000 000 000 ; call read8
+
+074 060 ; cmp al, '0'
+017 235 301 ; setge cl
+074 067 ; cmp al, '7'
+017 236 302 ; setle dl
+042 312 ; and cl, dl
+165 346 ; jnz .readOctalDigit
+
+127 ; push edi
+350 333 000 000 000 ; call write8
+351 250 377 377 377 ; jmp .readBegin
+
+; .readLabel:
+213 320 ; mov edx, eax
+122 ; push edx
+200 372 072 ; cmp dl, ':'
+017 235 301 ; setle cl
+200 372 100 ; cmp dl, '@'
+017 236 305 ; setge ch
+042 315 ; and cl, ch
+200 372 046 ; cmp dl, '&'
+017 224 305 ; sete ch
+012 315 ; or cl, ch
+164 005 ; jz .readLabelName
+350 201 000 000 000 ; call read8
+; .readLabelName:
+215 173 310 ; lea edi, [ebx - 0x38]
+; .readLabelCharacter:
+252 ; stosb
+127 ; push edi
+350 167 000 000 000 ; call read8
+137 ; pop edi
+074 040 ; cmp al, ' '
+177 364 ; jg .readLabelCharacter
+215 163 310 ; lea esi, [ebx - 0x38]
+213 317 ; mov ecx, edi
+053 316 ; sub ecx, esi
+132 ; pop edx
+200 372 072 ; cmp dl, ':'
+165 020 ; jne .lookupLabel
+
+; .storeNewLabel:
+121 ; push ecx
+126 ; push esi
+213 103 354 ; mov eax, dword [ebx - 0x14]
+120 ; push eax
+350 336 000 000 000 ; call storeLabel(locationCounter, labelName, labelLength)
+351 134 377 377 377 ; jmp .readBegin
+
+; .lookupLabel
+122 ; push edx
+121 ; push ecx
+126 ; push esi
+350 371 000 000 000 ; call lookupLabel(labelName, labelLength)
+132 ; pop edx
+213 100 000 ; mov eax, dword [eax]
+213 113 354 ; mov ecx, [ebx - 0x14]
+
+200 372 046 ; cmp dl, '&'
+164 043 ; je .writePointer32
+200 372 100 ; cmp dl, '@'
+164 020 ; je .writeRelative8
+; .writeRelative32:
+053 301 ; sub eax, ecx
+203 350 004 ; sub eax, 4
+120 ; push eax
+350 202 000 000 000 ; call write32(labelOffset - locationCounter - 4)
+351 063 377 377 377 ; jmp .readBegin
+
+; .writeRelative8:
+053 301 ; sub eax, ecx
+110 ; dec eax
+120 ; push eax
+350 130 000 000 000 ; call write8(labelOffset - locationCounter - 1)
+351 045 377 377 377 ; jmp .readBegin
+
+; .writePointer32:
+213 113 350 ; mov ecx, [ebx - 0x18]
+003 301 ; add eax, ecx
+120 ; push eax
+350 144 000 000 000 ; call write32(labelOffset + origin)
+351 025 377 377 377 ; jmp .readBegin
+
+; .epilogue:
+350 170 000 000 000 ; call dumpOutput
+270 001 000 000 000 ; mov eax, 1
+063 333 ; xor ebx, ebx
+315 200 ; int 0x80 ; exit(0)
+
+; read8
+215 263 310 376 377 377 ; lea esi, [ebx - 0x138]
+213 113 364 ; mov ecx, [ebx - 0xC]
+213 123 360 ; mov edx, [ebx - 0x10]
+073 312 ; cmp ecx, edx
+174 035 ; jl .readByte
+306 006 000 ; mov dword [esi], 0
+123 ; push ebx
+270 003 000 000 000 ; mov eax, 3
+213 316 ; mov ecx, esi
+063 333 ; xor ebx, ebx
+272 000 001 000 000 ; mov edx, 0x100
+315 200 ; int 0x80 ; read(stdin, input, 0x100)
+133 ; pop ebx
+211 103 360 ; mov dword [ebx - 0x10], eax
+063 311 ; xor ecx, ecx
+211 113 364 ; mov dword [ebx - 0xC], ecx
+; .readByte
+017 266 004 016 ; movzx eax, byte [esi + ecx]
+377 103 364 ; inc dword [ebx - 0xC]
+303 ; ret
+
+; write8(value: uint8)
+213 173 374 ; mov edi, dword [ebx - 0x4]
+213 113 370 ; mov ecx, dword [ebx - 0x8]
+213 104 044 004 ; mov eax, [esp + 0x4]
+210 004 017 ; mov byte [edi + ecx], al
+377 203 370 377 377 377 ; inc dword [ebx - 0x8]
+377 203 354 377 377 377 ; inc dword [ebx - 0x14]
+302 004 000 ; ret 4
+
+; write32(value: uint32)
+213 173 374 ; mov edi, dword [ebx - 0x4]
+213 113 370 ; mov ecx, dword [ebx - 0x8]
+213 104 044 004 ; mov eax, dword [esp + 0x4]
+211 004 017 ; mov dword [edi + ecx], eax
+201 103 370 004 000 000 000 ; add dword [ebx - 0x8], 4
+201 103 354 004 000 000 000 ; add dword [ebx - 0x14], 4
+302 004 000 ; ret 4
+
+; dumpOutput
+123 ; push ebx
+270 004 000 000 000 ; mov eax, 0x4
+213 113 374 ; mov ecx, dword [ebx - 0x4]
+213 123 370 ; mov edx, dword [ebx - 0x8]
+273 001 000 000 000 ; mov ebx, 1
+315 200 ; int 0x80 ; write(stdout, output, outputLength)
+133 ; pop ebx
+303 ; ret
+
+; storeLabel(offset: uint32, name: const uint8*, uint32 length)
+213 123 344 ; mov edx, dword [ebx - 0x1C]
+213 104 044 004 ; mov eax, dword [esp + 0x4]
+211 002 ; mov dword [edx], eax
+213 114 044 014 ; mov ecx, dword [esp + 0xC]
+211 112 004 ; mov dword [edx + 0x4], ecx
+213 164 044 010 ; mov esi, dword [esp + 0x8]
+215 172 010 ; lea edi, [edx + 0x8]
+363 244 ; rep movsb
+201 302 040 000 000 000 ; add edx, 0x20
+211 123 344 ; mov dword [ebx - 0x1C], edx
+215 102 340 ; lea eax, [edx - 0x20]
+302 014 000 ; ret
+
+; lookupLabel(name: const uint8*, uint32 length)
+215 223 310 336 377 377 ; lea edx, dword [ebx - 0x2138]
+; .compareEntry:
+213 164 044 004 ; mov esi, dword [esp + 0x4]
+215 172 010 ; lea edi, dword [edx + 0x8]
+213 114 044 010 ; mov ecx, dword [esp + 0x8]
+363 246 ; rep cmpsb
+164 021 ; je .epilogue
+213 103 344 ; mov eax, dword [ebx - 0x1C]
+213 312 ; mov ecx, edx
+201 302 040 000 000 000 ; add edx, 32
+073 301 ; cmp eax, ecx
+165 342 ; jne .compareEntry
+063 322 ; xor edx, edx
+; .epilogue:
+213 302 ; mov eax, edx
+302 010 00 ; ret
