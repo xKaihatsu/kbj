@@ -2,7 +2,7 @@
 
 ## Generation 2
 
-Octr begins at generation 2, it's a simple language that accepts octets and allows for comments in the source code.
+Octr begins at generation 2, it's a simple language that accepts octets written in octal and allows for comments in the source code.
 
 ## Generation 3
 
