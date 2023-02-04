@@ -1,0 +1,623 @@
+@000 000 000 010
+177 105 114 106 ; ELF Signature
+001 ; ELF-32
+001 ; little endian
+001 ; current ELF version
+000 ; System-V ABI
+000 ; ABI Version
+000 000 000 000 000 000 000 ; padding
+002 000 ; executable object file
+003 000 ; i386
+001 000 000 000 ; original file version
+&_start ; entry point
+064 000 000 000 ; start of segment headers
+000 000 000 000 ; start of section headers
+000 000 000 000 ; flags
+064 000 ; size of this header
+040 000 ; size of segment header
+001 000 ; number of segment headers
+050 000 ; size of section header
+000 000 ; number of section headers
+000 000 ; string table index
+
+; .text segment header
+001 000 000 000 ; loadable segment
+124 000 000 000 ; offset in file
+124 000 000 010 ; virtual address
+000 000 000 000 ; physical address
+000 002 000 000 ; size on disk
+000 002 000 000 ; size in memory
+005 000 000 000 ; R+X permissions
+001 000 000 000 ; alignment
+
+; outputBuffer: uint8* -0x4
+; labels: Label* -0x8
+; patches: Patch* -0xC
+; nextPatchIndex: uint32 -0x10
+; locationCounter: uint32 -0x14
+; origin: uint32 -0x18
+; inputIndex: uint32 -0x1C
+; inputLength: uint32 -0x20
+; input: uint8[256] -0x120
+; labelNameBuffer: uint8[256] -0x220
+; struct Label {
+;	uint32 Offset;
+;	uint32 Origin;
+;	uint32 FirstPatchIndex;
+;	uint32 Length;
+;	uint8 Name[256];
+; }
+; struct Patch {
+;	uint32 Type;
+;	uint32 OutputIndex;
+;	uint32 NextPatchIndex;
+; }
+:_start
+213 354 ; mov ebp, esp
+201 354 040 002 000 000 ; sub esp, 0x220
+213 335 ; mov ebx, ebp
+
+; create output buffer
+152 001 ; push 1
+350 makeBuffer ; call makeBuffer(sizeof(uint8))
+211 105 374 ; mov dword [ebp - 0x4], eax
+
+; create label buffer
+150 020 001 000 000 ; push 272
+350 makeBuffer ; call makeBuffer(sizeof(Label))
+211 105 370 ; mov dword [ebp - 0x8], eax
+
+; create patches buffer
+152 014 ; push 12
+350 makeBuffer ; call makeBuffer(sizeof(Patch))
+211 105 364 ; mov dword [ebp - 0xC], eax
+
+213 335 ; mov ebx, ebp
+063 300 ; xor eax, eax
+; mov dword [ebx - 0x
+211 103 360 ; mov dword [ebx - 0x10], eax
+211 103 354 ; mov dword [ebx - 0x14], eax
+211 103 350 ; mov dword [ebx - 0x18], eax
+
+:.readBegin
+350 nextCharacter ; call nextCharacter
+204 300 ; test al, al
+017 204 .epilogue ; jz .epilogue
+074 040 ; cmp al, ' '
+176 @.readBegin ; jle :.readBegin
+
+074 073 ; cmp al, ';'
+165 @.octal? ; jne .octal?
+:.readComment
+350 read8 ; call read8
+204 300 ; test al, al
+017 204 .epilogue ; jz .epilogue
+074 012 ; cmp al, '\n'
+165 @.readComment ; jne .readComment
+351 .readBegin ; jmp .readBegin
+
+:.octal?
+074 060 ; cmp al, '0'
+017 235 301 ; setge cl
+074 067 ; cmp al, '7'
+017 236 305 ; setle ch
+042 315 ; and cl, ch
+164 @.label? ; jz .label?
+
+:.readOctal
+063 377 ; xor edi, edi
+:.readOctalDigits
+301 347 003 ; shl edi, 3
+044 017 ; and al, 0xF
+003 370 ; add edi, eax
+350 read8 ; call read8
+074 060 ; cmp al, '0'
+017 235 301 ; setge cl
+074 067 ; cmp al, '7'
+017 236 305 ; setle ch
+042 315 ; and cl, ch
+165 @.readOctalDigits ; jnz @.readOctalDigits
+127 ; push edi
+350 write8 ; call write8
+351 .readBegin ; jmp .readBegin
+
+:.label?
+074 140 ; cmp al, '`'
+017 204 .stringLiteral ; je .stringLiteral
+
+213 320 ; mov edx, eax
+122 ; push edx
+074 072 ; cmp al, ':'
+017 224 301 ; sete cl
+074 100 ; cmp al, '@'
+017 224 305 ; sete ch
+012 315 ; or cl, ch
+074 046 ; cmp al, '&'
+017 224 305 ; sete ch
+012 315 ; or cl, ch
+164 @.readLabel ; jz .readLabel
+350 read8 ; call read8 ; consume ':', '@', or '&'
+
+213 024 044 ; mov edx, dword [esp]
+074 060 ; cmp al, '0'
+017 235 301 ; setge cl
+074 067 ; cmp al, '7'
+017 236 305 ; setle ch
+042 315 ; and cl, ch
+200 372 100 ; cmp dl, '@'
+017 224 305 ; sete ch
+042 315 ; and cl, ch
+164 @.readLabel ; jz .readLabel
+
+:.readOrigin
+063 311 ; xor ecx, ecx
+063 322 ; xor edx, edx
+211 123 354 ; mov dword [ebx - 0x14], edx
+
+:.nextOriginOctet
+121 ; push ecx
+122 ; push edx
+063 377 ; xor edi, edi
+:.readOriginOctet
+301 347 003 ; shl edi, 3
+200 340 017 ; and al, 0xF
+003 370 ; add edi, eax
+350 read8 ; call read8
+074 060 ; cmp al, '0'
+017 235 301 ; setge cl
+074 067 ; cmp al, '7
+017 236 305 ; setle ch
+040 315 ; and cl, ch
+165 @.readOriginOctet ; jnz .readOriginOctet
+132 ; pop edx
+131 ; pop ecx
+
+323 347 ; shl edi, cl
+013 327 ; or edx, edi
+203 301 010 ; add ecx, 8
+074 012 ; cmp al, '\n'
+165 @.nextOriginOctet ; jne .nextOriginOctet
+211 123 350 ; mov dword [ebx - 0x14], edx
+351 .readBegin ; jmp .readBegin
+
+:.readLabel
+215 273 340 375 377 377 ; lea edi, [ebx - 0x220]
+:.readLabelChar
+252 ; stosb
+350 read8 ; call read8
+074 040 ; cmp al, ' '
+177 @.readLabelChar ; jg .readLabelChar
+215 263 340 375 377 377 ; lea esi, [ebx - 0x220]
+213 317 ; mov ecx, edi
+053 316 ; sub ecx, esi
+213 024 044 ; mov edx, dword [esp]
+200 372 072 ; cmp dl, ':'
+165 @.lookupLabel ; jne @.lookupLabel
+
+:.storeNewLabel
+213 103 354 ; mov eax, dword [ebx - 0x14]
+213 123 350 ; mov edx, dword [ebx - 0x18]
+121 ; push ecx
+126 ; push esi
+122 ; push edx
+120 ; push eax
+350 storeLabel ; call storeLabel(locationCounter, origin, labelName, labelLength) 
+351 .readBegin ; jmp .readBegin
+
+:.lookupLabel
+121 ; push ecx
+126 ; push esi
+121 ; push ecx
+126 ; push esi
+350 lookupLabel ; call lookupLabel(name, nameLength)
+205 300 ; test eax, eax
+165 @.needsPatch? ; jnz .needsPatch?
+
+; labelName and labelLength already on top of stack
+152 000 ; push 0
+152 000 ; push 0
+350 storeLabel ; call storeLabel(0, 0, name, nameLength)
+
+213 113 374 ; mov ecx, dword [ebx - 0x4]
+213 111 364 ; mov ecx, [ecx - 0xC]
+213 024 044 ; mov edx, dword [esp]
+120 ; push eax
+122 ; push edx
+121 ; push ecx
+120 ; push eax
+350 addPatch ; call addPatch(label, bufferLength(outputBuffer), patchType)
+130 ; pop eax
+351 .writeLabel ; jmp .writeLabel
+
+:.needsPatch?
+203 304 010 ; add esp, 8 ; pop off labelName and labelLength
+213 113 374 ; mov ecx, dword [ebx - 0x4]
+213 111 364 ; mov ecx, [ecx - 0xC]
+213 024 044 ; mov edx, dword [esp]
+203 170 010 000 ; cmp dword [eax + 0x8], 0
+164 @.writeLabel ; jz .writeLabel
+120 ; push eax
+122 ; push edx
+121 ; push ecx
+120 ; push eax
+350 addPatch ; call addPatch(label, bufferLength(outputBuffer), patchType)
+130 ; pop eax
+
+:.writeLabel
+132 ; pop edx
+213 000 ; mov eax, dword [eax]
+213 113 354 ; mov ecx, dword [ebx - 0x14]
+200 372 100 ; cmp dl, '@'
+164 @.writeRelative8 ; je .writeRelative8
+200 372 046 ; cmp dl, '&'
+164 @.writePointer32 ; je .writePointer32
+
+:.writeRelative32
+053 301 ; sub eax, ecx
+203 350 004 ; sub eax, 4
+120 ; push eax
+350 write32 ; call write32(labelOffset - locationCounter - 4)
+351 .readBegin ; jmp .readBegin
+
+:.writeRelative8
+053 301 ; sub eax, ecx
+110 ; dec eax
+120 ; push eax
+350 write8 ; call write8(labelOffset - locationCounter - 1)
+351 .readBegin ; jmp .readBegin
+
+:.writePointer32
+003 103 350 ; add eax, dword [ebx - 0x18]
+120 ; push eax
+350 write32 ; call write32(labelOffset + origin)
+351 .readBegin ; jmp .readBegin
+
+:.stringLiteral
+350 read8 ; call read8
+074 140 ; cmp al, '`'
+017 204 .readBegin ; je .readBegin
+204 300 ; test al, al
+017 204 .epilogue ; jz .epilogue
+120 ; push eax
+350 write8 ; call write8
+351 .stringLiteral ; jmp .stringLiteral
+
+:.epilogue
+350 patchLabels ; call patchLabels
+213 173 374 ; mov edi, dword [ebx - 0x4]
+127 ; push edi
+350 dumpBuffer ; call dumpBuffer
+270 001 000 000 000 ; mov eax, 1
+063 333 ; xor ebx, ebx
+315 200 ; int 0x80
+
+:read8
+215 263 340 376 377 377 ; lea esi, [ebx - 0x120]
+213 113 344 ; mov ecx, dword [ebx - 0x1C]
+213 123 340 ; mov edx, dword [ebx - 0x20]
+073 312 ; cmp ecx, edx
+175 @.refillInput ; jge .refillInput
+:.read8
+017 266 004 016 ; movzx eax, dword [esi + ecx]
+377 103 344 ; inc dword [ebx - 0x1C]
+303 ; ret
+:.refillInput
+123 ; push ebx
+306 006 000 ; mov byte [esi], 0
+270 003 000 000 000 ; mov eax, 3
+063 333 ; xor ebx, ebx
+213 316 ; mov ecx, esi
+272 000 001 000 000 ; mov edx, 256
+315 200 ; int 0x80 ; read(stdin, input, 256)
+133 ; pop ebx
+211 103 340 ; mov dword [ebx - 0x20], eax
+063 311 ; xor ecx, ecx
+211 113 344 ; mov dword [ebx - 0x1C], ecx
+351 .read8 ; jmp .read8
+
+:write8 ; (uint8 value)
+215 173 374 ; lea edi, [ebx - 0x4]
+213 104 044 004 ; mov eax, dword [esp + 0x4]
+377 103 354 ; inc dword [ebx - 0x14]
+120 ; push eax
+127 ; push edi
+350 bufferPushUInt8 ; call bufferPushUInt8(outputBuffer, value)
+302 004 000 ; ret 4
+
+:write32 ; (uint32 value)
+215 173 374 ; lea edi, [ebx - 0x4]
+213 104 044 004 ; mov eax, dword [esp + 0x4]
+203 103 354 004 ; add dword [ebx - 0x14], 4
+120 ; push eax
+127 ; push edi
+350 bufferPushUInt32 ; call bufferPushUInt32(outputBuffer, value)
+302 004 000 ; ret 4
+
+:nextCharacter
+215 263 340 376 377 377 ; lea esi, [ebx - 0x120]
+213 113 344 ; mov ecx, dword [ebx - 0x1C]
+213 123 340 ; mov edx, dword [ebx - 0x20]
+073 312 ; cmp ecx, edx
+017 215 read8 ; jge read8
+017 266 004 016 ; movzx eax, dword [esi + ecx]
+377 103 344 ; inc dword [ebx - 0x1C]
+303 ; ret
+
+; struct Buffer {
+;	uint32 Size;
+;	uint32 Capacity;
+;	uint32 ElementSize;
+;	uint8[] Data;
+; }
+; Allocate a buffer using mmap.
+:makeBuffer ; (uint32 elementSize)
+125 ; push ebp
+213 354 ; mov ebp, esp
+123 ; push ebx
+
+063 333 ; xor ebx, ebx
+272 000 020 000 000 ; mov edx, 0x1000
+
+270 132 000 000 000 ; mov eax, 0x5A
+203 354 030 ; sub esp, 24
+211 034 044 ; mov dword [esp], ebx
+211 124 044 004 ; mov dword [esp + 0x4], edx
+307 104 044 010 003 000 000 000 ; mov dword [esp + 0x8], 0x3 ; PROT_READ (0x1) | PROT_WRITE(0x2)
+307 104 044 014 042 000 000 000 ; mov dword [esp + 0xC], 0x22 ; MAP_PRIVATE(0x2) | MAP_ANONYMOUS (0x20)
+307 104 044 020 377 377 377 377 ; mov dword [esp + 0x10], -1
+211 134 044 024 ; mov dword [esp + 0x14], ebx
+213 334 ; mov ebx, esp
+315 200 ; int 0x80 ; mmap(null, 0x1000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
+203 304 030 ; add esp, 24
+213 360 ; mov esi, eax
+215 100 014 ; lea eax, [eax + 0xC]
+
+063 333 ; xor ebx, ebx
+213 115 010 ; mov ecx, dword [ebp + 0x8]
+
+211 036 ; mov dword [esi], ebx
+211 126 004 ; mov dword [esi + 0x4], edx
+211 116 010 ; mov dword [esi + 0x8], ecx
+
+133 ; pop ebx
+213 345 ; mov esp, ebp
+135 ; pop ebp
+302 004 000 ; ret 4
+
+; Double the buffer's capacity, and return it.
+:bufferGrow ; (void** buffer)
+123 ; push ebx
+
+270 243 000 000 000 ; mov eax, 0xA3
+213 134 044 010 ; mov ebx, dword [esp + 0x8]
+213 033 ; mov ebx, dword [ebx]
+215 133 364 ; lea ebx, [ebx - 0xC]
+213 113 004 ; mov ecx, dword [ebx + 0x4]
+215 024 115 000 000 000 000 ; lea edx, [ecx * 2]
+276 001 000 000 000 ; mov esi, MREMAP_MAYMOVE
+063 377 ; xor edi, edi
+211 123 004 ; mov dword [ebx + 0x4], edx
+315 200 ; int 0x80 ; mremap(buffer, bufferSize(buffer), bufferSize(buffer) * 2, MREMAP_MAYMOVE, 0)
+215 100 014 ; lea eax, [eax + 0xC]
+213 134 044 010 ; mov ebx, dword [esp + 0x8]
+211 003 ; mov dword [ebx], eax
+133 ; pop ebx
+302 004 000 ; ret 4
+
+:bufferPushAny ; (void** buffer, void* data, uint32 length)
+213 174 044 004 ; mov edi, dword [esp + 0x4]
+213 077 ; mov edi, [edi]
+215 127 364 ; lea edx, [edi - 0xC]
+213 114 044 014 ; mov ecx, dword [esp + 0xC]
+003 012 ; add ecx, dword [edx]
+073 112 004 ; cmp ecx, dword [edx + 0x4]
+175 @.growBuffer ; jge .regrowBuffer
+
+:.bufferAddData
+213 114 044 014 ; mov ecx, dword [esp + 0xC]
+213 164 044 010 ; mov esi, dword [esp + 0x8]
+003 072 ; add edi, dword [edx]
+363 244 ; rep movsb
+213 114 044 014 ; mov ecx, dword [esp + 0xC]
+001 012 ; add dword [edx], ecx
+302 014 000 ; ret 12
+:.growBuffer
+213 174 044 004 ; mov edi, dword [esp + 0x4]
+127 ; push edi
+350 bufferGrow ; call bufferGrow
+213 370 ; mov edi, eax
+215 120 364 ; lea edx, [eax - 0xC]
+351 .bufferAddData ; jmp .bufferAddData
+
+:bufferPushItem ; (void** buffer, void* data)
+213 174 044 004 ; mov edi, dword [esp + 0x4]
+213 164 044 010 ; mov esi, dword [esp + 0x8]
+213 027 ; mov edx, [edi]
+215 122 364 ; lea edx, [edx - 0xC]
+213 112 010 ; mov ecx, dword [edx + 0x8]
+121 ; push ecx
+126 ; push esi
+127 ; push edi
+350 bufferPushAny ; call bufferPushAny ; call bufferPushAny(buffer, data, bufferElementSize)
+302 010 000 ; ret 8
+
+:bufferPushUInt8 ; (void** buffer, uint8 value)
+213 174 044 004 ; mov edi, dword [esp + 0x4]
+215 164 044 010 ; lea esi, [esp + 0x8]
+152 001 ; push 1
+126 ; push esi
+127 ; push edi
+350 bufferPushAny ; call bufferPushAny(buffer, &value, sizeof(uint8))
+302 010 000 ; ret 8
+
+:bufferPushUInt32 ; (void** buffer, uint32 value)
+213 174 044 004 ; mov edi, dword [esp + 0x4]
+215 164 044 010 ; lea esi, [esp + 0x8]
+152 004 ; push 4
+126 ; push esi
+127 ; push edi
+350 bufferPushAny ; call bufferPushAny(buffer, &value, sizeof(uint32))
+302 010 000 ; ret 8
+
+; Dump buffer to standard output.
+:dumpBuffer ; (void* buffer)
+123 ; push ebx
+270 004 000 000 000 ; mov eax, 4
+273 001 000 000 000 ; mov ebx, 1
+213 114 044 010 ; mov ecx, dword [esp + 0x8]
+213 121 364 ; mov edx, dword [ecx - 0xC]
+315 200 ; int 0x80 ; write(stdout, buffer, bufferLength(buffer))
+133 ; pop ebx
+302 004 000 ; ret 4
+
+:lookupLabel ; (uint8* name, uint32 length)
+213 123 370 ; mov edx, dword [ebx - 0x8]
+
+:.compareEntry
+213 164 044 004 ; mov esi, dword [esp + 0x4]
+215 172 020 ; lea edi, [edx + 0x10]
+213 114 044 010 ; mov ecx, dword [esp + 0x8]
+363 246 ; rep cmpsb
+164 @.lookupEnd ; je .lookupEnd
+201 302 020 001 000 000 ; add edx, 272
+203 172 014 000 ; cmp dword [edx + 0xC], 0
+165 @.compareEntry ; jnz @.compareEntry
+063 322 ; xor edx, edx
+:.lookupEnd
+213 302 ; mov eax, edx
+302 010 000 ; ret 8
+
+:storeLabel ; (uint32 offset, uint32 origin, uint8* name, uint32 nameLength)
+125 ; push ebp
+213 354 ; mov ebp, esp
+201 354 020 001 000 000 ; sub esp, 272
+
+213 165 020 ; mov esi, dword [ebp + 0x10]
+213 115 024 ; mov ecx, dword [ebp + 0x14]
+121 ; push ecx
+126 ; push esi
+350 lookupLabel ; call lookupLabel(name, nameLength)
+205 300 ; test eax, eax
+164 @.storeLabel ; jz .storeLabel
+213 115 010 ; mov ecx, dword [ebp + 0x8]
+213 125 014 ; mov edx, dword [ebp + 0xC]
+211 010 ; mov dword [eax], ecx
+211 120 004 ; mov dword [eax + 0x4], edx
+351 .storeLabelEnd
+
+:.storeLabel
+213 105 010 ; mov eax, dword [ebp + 0x8]
+213 125 014 ; mov edx, dword [ebp + 0xC]
+213 165 020 ; mov esi, dword [ebp + 0x10]
+213 115 024 ; mov ecx, dword [ebp + 0x14]
+215 174 044 020 ; lea edi, [esp + 0x10]
+
+211 004 044 ; mov dword [esp], eax
+211 124 044 004 ; mov dword [esp + 0x4], edx
+307 104 044 010 000 000 000 000 ; mov dword [esp + 0x8], 0
+211 114 044 014 ; mov dword [esp + 0xC], ecx
+
+363 244 ; rep movsb
+215 173 370 ; lea edi, [ebx - 0x8]
+
+124 ; push esp
+127 ; push edi
+350 bufferPushItem ; call bufferPushItem(&labels, &label)
+213 163 370 ; mov esi, dword [ebx - 0x8]
+213 116 364 ; mov ecx, dword [esi - 0xC]
+215 204 016 360 376 377 377  ; mov eax, dword [esi + ecx - 272]
+
+:.storeLabelEnd
+213 345 ; mov esp, ebp
+135 ; pop ebp
+302 020 000 ; ret 16
+
+:addPatch ; (Label* label, uint32 offset, uint32 patchType)
+125 ; push ebp
+213 354 ; mov ebp, esp
+203 354 014 ; sub esp, 12
+
+377 103 360 ; inc dword [ebx - 0x10]
+213 175 010 ; mov edi, dword [ebp + 0x8]
+213 115 014 ; mov ecx, dword [ebp + 0xC]
+213 125 020 ; mov edx, dword [ebp + 0x10]
+213 107 010 ; mov eax, dword [edi + 0x8]
+
+211 024 044 ; mov dword [esp], edx
+211 114 044 004 ; mov dword [esp + 0x4], ecx
+211 104 044 010 ; mov dword [esp + 0x8], eax
+213 103 360 ; mov eax, dword [ebx - 0x10]
+211 107 010 ; mov dword [edi + 0x8], eax
+215 173 364 ; lea edi, [ebx - 0xC]
+
+124 ; push esp
+127 ; push edi
+350 bufferPushItem ; call bufferPushItem(&patches, &patch)
+
+213 345 ; mov esp, ebp
+135 ; pop ebp
+302 014 000 ; ret 12
+
+:backpatchLabel ; (Label* label)
+213 124 044 004 ; mov edx, dword [esp + 0x4]
+213 112 010 ; mov ecx, dword [edx + 0x8]
+:.patchLabel
+205 311 ; test ecx, ecx
+164 @.backpatchEnd ; jz .backpatchEnd
+111 ; dec ecx
+151 311 014 000 000 000 ; imul ecx, ecx, 12
+213 163 364 ; mov esi, dword [ebx - 0xC]
+215 064 016 ; mov esi, dword [esi + ecx]
+213 173 374 ; mov edi, dword [ebx - 0x4]
+213 116 004 ; mov ecx, dword [esi + 0x4]
+215 074 017 ; lea edi, [edi + ecx]
+213 006 ; mov eax, dword [esi]
+074 100 ; cmp al, '@'
+164 @.patchRelative8 ; je .patchRelative8
+074 046 ; cmp al, '&'
+164 @.patchPointer32 ; je .patchPointer32
+
+:.patchRelative32
+213 002 ; mov eax, dword [edx]
+003 102 004 ; add eax, dword [edx + 0x4]
+053 106 004 ; sub eax, dword [esi + 0x4]
+203 350 004 ; sub eax, 4
+211 007 ; mov dword [edi], eax
+351 .nextLabel ; jmp .nextLabel
+
+:.patchRelative8
+213 002 ; mov eax, dword [edx]
+003 102 004 ; add eax, dword [edx + 0x4]
+053 106 004 ; sub eax, dword [esi + 0x4]
+110 ; dec eax
+210 007 ; mov byte [edi], al
+351 .nextLabel
+
+:.patchPointer32
+213 002 ; mov eax, dword [edx]
+003 102 004 ; add eax, dword [edx + 0x4]
+211 007 ; mov dword [edi], eax
+
+:.nextLabel
+213 116 010 ; mov ecx, dword [esi + 0x8]
+351 .patchLabel ; jmp .patchLabel
+:.backpatchEnd
+302 004 000 ; ret 4
+
+:patchLabels
+213 123 370 ; mov edx, dword [ebx - 0x8]
+:.patchNext
+213 172 010 ; mov edi, dword [edx + 0x8]
+205 377 ; test edi, esi
+164 @.atEndOfLabels? ; jz .atEndOfLabels?
+122 ; push edx
+122 ; push edx
+350 backpatchLabel ; call backpatchLabel
+132 ; pop edx
+:.atEndOfLabels?
+201 302 020 001 000 000 ; add edx, 272
+203 172 014 000 ; cmp dword [edx + 0xC], 0
+165 @.patchNext ; jnz .patchNext
+303 ; ret
+
+
