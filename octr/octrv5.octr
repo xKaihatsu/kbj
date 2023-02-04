@@ -615,8 +615,8 @@
 :.atEndOfLabels?
 201 302 020 001 000 000 ; add edx, 272
 213 103 370 ; mov eax, dword [ebx - 0x8]
-213 100 364 ; add eax, dword [eax - 0xC]
-203 172 014 000 ; cmp eax, edx
+003 100 364 ; add eax, dword [eax - 0xC]
+073 320 ; cmp edx, eax
 174 @.patchNext ; jl .patchNext
 303 ; ret
 
