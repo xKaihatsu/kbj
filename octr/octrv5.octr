@@ -579,7 +579,6 @@
 
 :.patchRelative32
 213 002 ; mov eax, dword [edx]
-003 102 004 ; add eax, dword [edx + 0x4]
 053 106 004 ; sub eax, dword [esi + 0x4]
 203 350 004 ; sub eax, 4
 211 007 ; mov dword [edi], eax
@@ -594,6 +593,7 @@
 
 :.patchPointer32
 213 002 ; mov eax, dword [edx]
+003 102 004 ; add eax, dword [edx + 0x4]
 211 007 ; mov dword [edi], eax
 
 :.nextLabel
