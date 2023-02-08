@@ -477,8 +477,11 @@
 213 164 044 004 ; mov esi, dword [esp + 0x4]
 215 172 020 ; lea edi, [edx + 0x10]
 213 114 044 010 ; mov ecx, dword [esp + 0x8]
+073 112 014 ; cmp ecx, dword [edx + 0xC]
+165 @.nextLabelEntry ; jne .nextLabelEntry
 363 246 ; rep cmpsb
 164 @.lookupEnd ; je .lookupEnd
+:.nextLabelEntry
 201 302 020 001 000 000 ; add edx, 272
 203 172 014 000 ; cmp dword [edx + 0xC], 0
 165 @.compareEntry ; jnz @.compareEntry

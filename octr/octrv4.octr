@@ -8,7 +8,7 @@
 002 000 ; executable object file
 003 000 ; i386
 001 000 000 000 ; original file version
-343 001 000 010 ; entry point
+350 001 000 010 ; entry point
 064 000 000 000 ; start of segment headers
 000 000 000 000 ; start of section headers
 000 000 000 000 ; flags
@@ -87,8 +87,11 @@
 213 164 044 004 ; mov esi, dword [esp + 0x4]
 215 172 020 ; lea edi, dword [edx + 0x10]
 213 114 044 010 ; mov ecx, dword [esp + 0x8]
+073 112 010 ; cmp ecx, dword [edx + 0x8]
+165 004 ; jne .nextLabelEntry
 363 246 ; rep cmpsb
 164 021 ; je .epilogue
+; .nextLabelEntry
 213 103 344 ; mov eax, dword [ebx - 0x1C]
 213 312 ; mov ecx, edx
 201 302 040 000 000 000 ; add edx, 32
